@@ -10,6 +10,7 @@ struct PushConsts
     uint PrevAlbedoBindlessIdx;
 
     bool FastReproject;
+    uint AccumulatedFrames;
 };
 
 [[vk::push_constant]]
@@ -94,9 +95,25 @@ void main(uint3 DTid : SV_DispatchThreadID)
 
     if (pushConsts.ProgressiveRender)
     {
-        AccumlateDiffuse[ipos] = lerp(PrevDiffuse[ipos], SourceDiffuse[ipos], clamp(1.0 / 512.0, 0.0, 1.0));
-        AccumlateSpecular[ipos] = lerp(PrevSpecular[ipos], SourceSpecular[ipos], clamp(1.0 / 512.0, 0.0, 1.0));
-        AccumlateAlbedo[ipos] = lerp(PrevAlbedo[ipos], SourceAlbedo[ipos], clamp(1.0 / 512.0, 0.0, 1.0));
+        float2 motion = MotionVector[ipos].rg;
+        int2 previpos = int2(floor(float2(ipos) + motion));
+        
+        // Check if reprojected pixel is within screen bounds
+        uint2 isize = Bindless.GetStorageTextureDimensions<float4>(Bindless.RT_SINGLE_DIFFUSE);
+        const bool inside = all(previpos < isize) && all(previpos >= int2(0, 0));
+
+        uint moment = Bindless.GetStorageTexture<uint>(Bindless.RT_MOTIONMOMENT)[ipos];
+        // If outside or first frame, reset weight to 1.0 to skip history
+        float weight = (pushConsts.AccumulatedFrames == 0 || moment > 0 || !inside) ? 1.0f : 1.0f / (float(pushConsts.AccumulatedFrames) + 1.0f);
+        
+        // Safety sampling for clamp or disocclusion
+        float4 prevDiffuse = inside ? PrevDiffuse[previpos] : SourceDiffuse[ipos];
+        float4 prevSpecular = inside ? PrevSpecular[previpos] : SourceSpecular[ipos];
+        float4 prevAlbedo = inside ? PrevAlbedo[previpos] : SourceAlbedo[ipos];
+
+        AccumlateDiffuse[ipos] = lerp(prevDiffuse, SourceDiffuse[ipos], weight);
+        AccumlateSpecular[ipos] = lerp(prevSpecular, SourceSpecular[ipos], weight);
+        AccumlateAlbedo[ipos] = lerp(prevAlbedo, SourceAlbedo[ipos], weight);
         return;
     }
 

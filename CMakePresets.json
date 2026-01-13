@@ -45,6 +45,15 @@
       }
     },
     {
+      "name": "windows-minsizerel",
+      "inherits": "windows-base",
+      "displayName": "Windows (MinSizeRel)",
+      "description": "Default Windows configuration",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "MinSizeRel"
+      }
+    },
+    {
       "name": "linux-base",
       "hidden": true,
       "inherits": "base",
@@ -159,6 +168,11 @@
       "name": "windows-dev",
       "configurePreset": "windows-dev",
       "configuration": "RelWithDebInfo"
+    },
+    {
+      "name": "windows-minsizerel",
+      "configurePreset": "windows-minsizerel",
+      "configuration": "MinSizeRel"
     },
     {
       "name": "linux-release",

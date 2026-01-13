@@ -48,6 +48,8 @@
 // spdlog logging
 #include <spdlog/spdlog.h>
 
+extern bool useAccumulation;
+
 #if ANDROID
 #include <spdlog/sinks/android_sink.h>
 #endif
@@ -510,6 +512,7 @@ bool NextEngine::Tick()
         if (progressivePreFrames_ == 0)
         {
             progressiveRendering_ = true;
+            accumulatedFrames_ = 0;
         }
     }
 
@@ -518,6 +521,15 @@ bool NextEngine::Tick()
     // sample gamepad stats
 
     TickGamepadInput();
+
+    if (progressiveRendering_)
+    {
+        accumulatedFrames_++;
+        if(accumulatedFrames_ > userSettings_.TemporalFrames * 10 && totalFrames_ > accumulatedFrames_) {
+            renderer_->SetFrameCount(accumulatedFrames_);
+        }
+    }
+
     return false;
 }
 
@@ -835,6 +847,7 @@ void NextEngine::SetProgressiveRendering(bool enable, bool directly)
     if (directly)
     {
         progressiveRendering_ = enable;
+        accumulatedFrames_ = 0;
         return;
     }
     
@@ -849,6 +862,7 @@ void NextEngine::SetProgressiveRendering(bool enable, bool directly)
     {
         progressivePreFrames_ = 0;
         progressiveRendering_ = false;
+        accumulatedFrames_ = 0;
     }
 }
 
@@ -893,6 +907,14 @@ Assets::UniformBufferObject NextEngine::GetUniformBufferObject(const VkOffset2D 
     ubo.DisableSpatialReuse = userSettings_.DisableSpatialReuse;
     ubo.SuperResolution = GOption->ReferenceMode ? 2 : userSettings_.SuperResolution;
     ubo.Projection[1][1] *= -1;
+
+    // Reset accumulation on camera movement or FOV change (Zoom)
+    if (useAccumulation && (ubo.ModelView != prevUBO_.ModelView || 
+        std::abs(ubo.Projection[0][0] - prevUBO_.Projection[0][0]) > 1e-5f || 
+        std::abs(ubo.Projection[1][1] - prevUBO_.Projection[1][1]) > 1e-5f))
+    {
+        scene_->MarkDirty();
+    }
 
     glm::mat4x4 projectionUnJit = ubo.Projection;    
     // handle android vulkan pre rotation
@@ -1090,6 +1112,7 @@ void NextEngine::OnRendererPostRender(VkCommandBuffer commandBuffer, uint32_t im
     stats.RenderTime = GetTime();
     
     stats.TotalFrames = totalFrames_;
+    stats.AccumulatedFrames = accumulatedFrames_;
     stats.InstanceCount = static_cast<uint32_t>(scene_->GetNodeProxys().size());
     stats.NodeCount = static_cast<uint32_t>(scene_->Nodes().size());
     stats.TriCount = scene_->GetIndicesCount() / 3;

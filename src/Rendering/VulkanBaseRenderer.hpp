@@ -97,6 +97,7 @@ namespace Vulkan
 		virtual Assets::UniformBufferObject GetUniformBufferObject(const VkOffset2D offset, const VkExtent2D extent) const;
 
 		int FrameCount() const {return frameCount_;}
+		void SetFrameCount(int frameCount) {frameCount_ = frameCount;}
 
 		virtual void SetPhysicalDeviceImpl(
 			VkPhysicalDevice physicalDevice, 

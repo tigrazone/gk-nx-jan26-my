@@ -16,6 +16,8 @@
 
 extern float GAndroidMagicScale;
 
+extern bool useAccumulation;
+
 // should use 1em instead of 1px
 constexpr float constTitlebarSize = 40;
 constexpr float constTitlebarControlSize = constTitlebarSize * 3;
@@ -399,6 +401,7 @@ void NextRendererGameInstance::DrawSettings()
 			{
 				GetEngine().GetScene().SetRenderCamera( GetEngine().GetScene().GetCameras()[userSetting.CameraIdx] );
 				modelViewController_.Reset(GetEngine().GetScene().GetRenderCamera());
+				if(useAccumulation) GetEngine().GetScene().MarkDirty(); // Reset accumulation
 			}
 
 			auto& camera = GetEngine().GetScene().GetRenderCamera();
@@ -409,6 +412,11 @@ void NextRendererGameInstance::DrawSettings()
 
 		if( ImGui::CollapsingHeader(LOCTEXT("Ray Tracing"), ImGuiTreeNodeFlags_DefaultOpen) )
 		{
+			if(ImGui::Checkbox(LOCTEXT("Accumulate"), &useAccumulation)) {
+				GetEngine().GetScene().MarkDirty();
+			}
+			ImGui::NewLine();
+
 			ImGui::Checkbox(LOCTEXT("AntiAlias"), &userSetting.TAA);
 			ImGui::SliderInt(LOCTEXT("Samples"), &userSetting.NumberOfSamples, 1, 16);
 			ImGui::SliderInt(LOCTEXT("TemporalSteps"), &userSetting.AdaptiveSteps, 2, 64);

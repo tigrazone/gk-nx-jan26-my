@@ -41,6 +41,7 @@ struct Statistics final
 	float RayRate;
 	uint32_t TotalSamples;
 	uint32_t TotalFrames;
+	uint32_t AccumulatedFrames;
 	double RenderTime;
 	uint32_t TriCount;
 	uint32_t InstanceCount;

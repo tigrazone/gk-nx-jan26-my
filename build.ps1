@@ -9,7 +9,7 @@
 
 .PARAMETER Target
     Build target. Defaults to 'windows-dev' (uses CMake Preset).
-    Options: windows-dev, android
+    Options: windows-dev, windows-minsizerel, android
 
 .PARAMETER Clean
     Clean the build directory before building.
@@ -23,7 +23,7 @@
 [CmdletBinding()]
 param (
     [Parameter(Position = 0)]
-    [string]$Preset = "windows-dev",
+    [string]$Preset = "windows-minsizerel",
 
     [Parameter()]
     [string]$Config,

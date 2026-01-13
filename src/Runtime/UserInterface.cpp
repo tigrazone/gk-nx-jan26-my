@@ -498,6 +498,7 @@ void UserInterface::DrawOverlay(const Statistics& statistics, Vulkan::VulkanGpuT
 		
 		ImGui::Separator();
 		LabelVal("Frame:", "%d", statistics.TotalFrames);
+		LabelVal("Accumulated:", "%d", statistics.AccumulatedFrames);
 		LabelVal("Time:", "%s", fmt::format("{:%H:%M:%S}", std::chrono::seconds(static_cast<long long>(statistics.RenderTime))).c_str());
 	}
 	ImGui::End();

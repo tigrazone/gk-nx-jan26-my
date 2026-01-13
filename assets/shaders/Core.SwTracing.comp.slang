@@ -16,7 +16,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
     renderer.ExitProbability = 0.5f;
     renderer.ExitAfterFirst = Bindless.GetGpuscene().Camera->FastGather;
     renderer.HitNormalOffset = CUBE_UNIT * 0.5;
-    renderer.SampleDownscale = 2;
+    renderer.SampleDownscale = 1;
     renderer.FuzzyTracing = false;
     renderer.ForceExitAfterFirst = false;
     renderer.Init(DTid.xy);

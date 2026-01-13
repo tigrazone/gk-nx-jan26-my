@@ -17,6 +17,8 @@
 
 #include <spdlog/spdlog.h>
 
+bool useAccumulation = true;
+
 namespace Assets
 {
     Scene::Scene(Vulkan::CommandPool& commandPool,
@@ -429,7 +431,11 @@ namespace Assets
         std::memcpy(data, gpuMaterials_.data(), gpuMaterials_.size() * sizeof(Material));
         materialBufferMemory_->Unmap();
 
-        NextEngine::GetInstance()->SetProgressiveRendering(false, false);
+        if(useAccumulation) {
+            NextEngine::GetInstance()->SetProgressiveRendering(true, true);
+        } else {
+            NextEngine::GetInstance()->SetProgressiveRendering(false, false);
+        }
     }
         
     bool Scene::UpdateNodes()
@@ -569,7 +575,12 @@ namespace Assets
     {
         sceneDirty_ = true;
         sceneDirtyForCpuAS_ = true;
-        NextEngine::GetInstance()->SetProgressiveRendering(false, false);
+
+        if(useAccumulation) {
+            NextEngine::GetInstance()->SetProgressiveRendering(true, true);
+        } else {
+            NextEngine::GetInstance()->SetProgressiveRendering(false, false);
+        }
     }
 
     void Scene::OverrideModelView(glm::mat4& outMatrix)

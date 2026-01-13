@@ -6,7 +6,7 @@ REM gkNextRenderer Build Script (Windows)
 REM Wrapper for build.ps1 to provide a standard CLI.
 REM ==============================================================================
 
-set "PRESET=windows-dev"
+set "PRESET=windows-minsizerel"
 set "CONFIG="
 set "TARGET="
 set "CLEAN=0"

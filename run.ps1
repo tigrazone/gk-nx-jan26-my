@@ -10,13 +10,13 @@ $ProjectRoot = $ScriptDir
 
 # Default values
 $Target = "gkNextRenderer.exe"
-$Preset = "windows-dev"
+$Preset = "windows-minsizerel"
 $BinDir = $null
 $PresentMode = @()
 $Scene = @()
 $List = $false
 $DryRun = $false
-$ExtraArgs = @()
+$ExtraArgs = " --samples 1 --bounces 25 --present-mode 0"
 
 $PresetOverridden = $false
 $BinOverridden = $false
@@ -160,7 +160,7 @@ if ([string]::IsNullOrWhiteSpace($ResolvedBin)) {
 
 # Priority 4: Smart Search
 if ([string]::IsNullOrWhiteSpace($ResolvedBin) -and -not $BinOverridden -and -not $PresetOverridden) {
-    $Candidates = @("windows-dev", "windows-release", "mingw")
+    $Candidates = @("windows-dev", "windows-minsizerel", "windows-release", "mingw")
     foreach ($Cand in $Candidates) {
         $CheckPath = Join-Path $ProjectRoot "out/build/$Cand/bin"
         if (Test-Path $CheckPath) {

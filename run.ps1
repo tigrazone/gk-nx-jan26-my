@@ -16,7 +16,7 @@ $PresentMode = @()
 $Scene = @()
 $List = $false
 $DryRun = $false
-$ExtraArgs = " --samples 1 --bounces 25 --present-mode 0"
+$ExtraArgs = " --samples 1 --bounces 25 --present-mode 0 --superres 4"
 
 $PresetOverridden = $false
 $BinOverridden = $false

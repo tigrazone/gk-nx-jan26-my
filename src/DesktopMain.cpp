@@ -1,10 +1,6 @@
 #include "Utilities/Exception.hpp"
 #include "Options.hpp"
 #include "Runtime/Engine.hpp"
-
-#include <fmt/format.h>
-#include <filesystem>
-//#include <cpptrace/cpptrace.hpp>
 #include "Runtime/Platform/PlatformCommon.h"
 
 #if WIN32
@@ -92,6 +88,11 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
     // Shutdown
     GApplication->End();
     
+    if (GOption->FastExit)
+    {
+        std::quick_exit(0);
+    }
+
     GApplication.reset();
     GOptionPtr.reset();
 }

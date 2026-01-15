@@ -526,6 +526,7 @@ bool NextEngine::Tick()
         {
             progressiveRendering_ = true;
             accumulatedFrames_ = 0;
+            ResetTimer();
         }
     }
 
@@ -635,6 +636,12 @@ bool NextEngine::IsSoundPlaying(const std::string& soundName)
     }
     ma_sound* sound = soundMaps_[soundName].get();
     return ma_sound_is_playing(sound);
+}
+
+static double gAccumulationStartTime = 0;
+void NextEngine::ResetTimer()
+{
+    gAccumulationStartTime = GetWindow().GetTime();
 }
 
 void NextEngine::SaveScreenShot(const std::string& filename, int x, int y, int width, int height)
@@ -868,6 +875,7 @@ void NextEngine::SetProgressiveRendering(bool enable, bool directly)
     {
         progressiveRendering_ = enable;
         accumulatedFrames_ = 0;
+        ResetTimer();
         return;
     }
     
@@ -883,6 +891,7 @@ void NextEngine::SetProgressiveRendering(bool enable, bool directly)
         progressivePreFrames_ = 0;
         progressiveRendering_ = false;
         accumulatedFrames_ = 0;
+        ResetTimer();
     }
 }
 
@@ -1129,7 +1138,7 @@ void NextEngine::OnRendererPostRender(VkCommandBuffer commandBuffer, uint32_t im
     stats.FramebufferSize = GetWindow().FramebufferSize();
     stats.RenderSize = renderer_->SwapChain().RenderExtent();
     stats.FrameRate = frameRate_;
-    stats.RenderTime = GetTime();
+    stats.RenderTime = GetWindow().GetTime() - gAccumulationStartTime;
     
     stats.TotalFrames = totalFrames_;
     stats.AccumulatedFrames = accumulatedFrames_;

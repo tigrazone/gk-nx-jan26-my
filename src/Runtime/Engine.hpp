@@ -139,6 +139,8 @@ public:
 	uint32_t GetAccumulatedFrames() const { return accumulatedFrames_; }
 	uint32_t GetTestNumber() const { return 20; }
 
+	void ResetTimer();
+
 	void RegisterJSCallback(std::function<void(double)> callback);
 
 	// remove till return true

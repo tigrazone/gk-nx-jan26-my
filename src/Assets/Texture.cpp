@@ -449,8 +449,49 @@ namespace Assets
                 ktxTexture2* kTexture = nullptr;
                 ktx_error_code_e result;
 #endif
+                // load from dds
+                bool isDDS = (mime.find("image/dds") != std::string::npos) || (bytelength > 128 && *(uint32_t*)copyedData == 0x20534444);
+                if (isDDS)
+                {
+                    struct DDS_PIXELFORMAT {
+                        uint32_t dwSize, dwFlags, dwFourCC, dwRGBBitCount, dwRBitMask, dwGBitMask, dwBBitMask, dwABitMask;
+                    };
+                    struct DDS_HEADER {
+                        uint32_t dwSize, dwFlags, dwHeight, dwWidth, dwPitchOrLinearSize, dwDepth, dwMipMapCount, dwReserved1[11];
+                        DDS_PIXELFORMAT ddspf;
+                        uint32_t dwCaps, dwCaps2, dwCaps3, dwCaps4, dwReserved2;
+                    };
+
+                    auto* header = (DDS_HEADER*)(copyedData + 4);
+                    width = header->dwWidth;
+                    height = header->dwHeight;
+                    miplevel = 1; 
+                    pixels = copyedData + 4 + header->dwSize;
+
+                    if (header->ddspf.dwFlags & 0x4) { // DDPF_FOURCC
+                        switch (header->ddspf.dwFourCC) {
+                        case 0x31545844: format = srgb ? VK_FORMAT_BC1_RGBA_SRGB_BLOCK : VK_FORMAT_BC1_RGBA_UNORM_BLOCK; break; // DXT1
+                        case 0x33545844: format = srgb ? VK_FORMAT_BC2_SRGB_BLOCK : VK_FORMAT_BC2_UNORM_BLOCK; break;      // DXT3
+                        case 0x35545844: format = srgb ? VK_FORMAT_BC3_SRGB_BLOCK : VK_FORMAT_BC3_UNORM_BLOCK; break;      // DXT5
+                        case 0x30315844: // DX10
+                        {
+                            struct DDS_HEADER_DXT10 {
+                                uint32_t dxgiFormat, resourceDimension, miscFlag, arraySize, miscFlags2;
+                            };
+                            auto* header10 = (DDS_HEADER_DXT10*)pixels;
+                            pixels += sizeof(DDS_HEADER_DXT10);
+                            if (header10->dxgiFormat == 98) format = VK_FORMAT_BC7_UNORM_BLOCK;
+                            else if (header10->dxgiFormat == 99) format = VK_FORMAT_BC7_SRGB_BLOCK;
+                            else if (header10->dxgiFormat == 95) format = VK_FORMAT_BC6H_UFLOAT_BLOCK;
+                            else if (header10->dxgiFormat == 96) format = VK_FORMAT_BC6H_SFLOAT_BLOCK;
+                            break;
+                        }
+                        }
+                    }
+                    size = bytelength - static_cast<uint32_t>(pixels - copyedData);
+                }
                 // load from ktx inside glb
-                if (mime.find("image/ktx") != std::string::npos)
+                else if (mime.find("image/ktx") != std::string::npos)
                 {
 #if WITH_KTX2
                     result = ktxTexture2_CreateFromMemory(copyedData, bytelength, KTX_TEXTURE_CREATE_CHECK_GLTF_BASISU_BIT, &kTexture);

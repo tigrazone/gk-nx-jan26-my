@@ -27,7 +27,7 @@ namespace Assets
 		TextureImage& operator = (const TextureImage&) = delete;
 		TextureImage& operator = (TextureImage&&) = delete;
 
-		TextureImage(Vulkan::CommandPool& commandPool, size_t width, size_t height, uint32_t miplevel, VkFormat format, const unsigned char* data, uint32_t size);
+		TextureImage(Vulkan::CommandPool& commandPool, size_t width, size_t height, uint32_t miplevel, VkFormat format, const unsigned char* data, uint32_t size, VkComponentMapping swizzle = { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY });
 		// Add to TextureImage.hpp in the public section
 		TextureImage(
 		    Vulkan::CommandPool& commandPool, 
@@ -38,7 +38,8 @@ namespace Assets
 		    const unsigned char* baseData, 
 		    uint32_t baseSize,
 		    const std::vector<std::vector<float>>& mipLevelData, 
-		    const std::vector<std::pair<int, int>>& mipDimensions);
+		    const std::vector<std::pair<int, int>>& mipDimensions,
+		    VkComponentMapping swizzle = { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY });
 		~TextureImage();
 
 		Vulkan::Image& Image() const { return *image_; }

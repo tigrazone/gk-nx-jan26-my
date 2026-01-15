@@ -494,10 +494,15 @@ namespace Assets
                 else if (mime.find("image/ktx") != std::string::npos)
                 {
 #if WITH_KTX2
-                    result = ktxTexture2_CreateFromMemory(copyedData, bytelength, KTX_TEXTURE_CREATE_CHECK_GLTF_BASISU_BIT, &kTexture);
+                    result = ktxTexture2_CreateFromMemory(copyedData, bytelength, KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &kTexture);
                     if (KTX_SUCCESS != result) Throw(std::runtime_error("failed to load ktx2 texture image "));
-                    result = ktxTexture2_TranscodeBasis(kTexture, KTX_TTF_BC7_RGBA, 0);
-                    if (KTX_SUCCESS != result) Throw(std::runtime_error("failed to load ktx2 texture image "));
+
+                    if (ktxTexture2_NeedsTranscoding(kTexture))
+                    {
+                        result = ktxTexture2_TranscodeBasis(kTexture, KTX_TTF_BC7_RGBA, 0);
+                        if (KTX_SUCCESS != result) Throw(std::runtime_error("failed to transcode ktx2 texture image "));
+                    }
+
                     pixels = ktxTexture_GetData(ktxTexture(kTexture));
 
                     ktx_size_t offset;
@@ -508,7 +513,7 @@ namespace Assets
                     format = static_cast<VkFormat>(kTexture->vkFormat);
                     width = kTexture->baseWidth;
                     height = kTexture->baseHeight;
-                    miplevel = 1;
+                    miplevel = kTexture->numLevels;
 #endif
                 }
                 else
@@ -818,7 +823,34 @@ namespace Assets
                 // create texture image
                 if (!hdr)
                 {
+#if WITH_KTX2
+                    VkComponentMapping swizzle = { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
+                    if (kTexture) // Only attempt to read swizzle if kTexture was loaded/created
+                    {
+                        ktx_uint8_t* swizzlePtr;
+                        unsigned int swizzleLen;
+                        if (ktxHashList_FindValue(&ktxTexture(kTexture)->kvDataHead, KTX_SWIZZLE_KEY, &swizzleLen, (void**)&swizzlePtr) == KTX_SUCCESS) {
+                            auto parse = [](char c) {
+                                if (c == 'r') return VK_COMPONENT_SWIZZLE_R;
+                                if (c == 'g') return VK_COMPONENT_SWIZZLE_G;
+                                if (c == 'b') return VK_COMPONENT_SWIZZLE_B;
+                                if (c == 'a') return VK_COMPONENT_SWIZZLE_A;
+                                if (c == '0') return VK_COMPONENT_SWIZZLE_ZERO;
+                                if (c == '1') return VK_COMPONENT_SWIZZLE_ONE;
+                                return VK_COMPONENT_SWIZZLE_IDENTITY;
+                            };
+                            if (swizzleLen >= 4) {
+                                swizzle.r = parse(swizzlePtr[0]);
+                                swizzle.g = parse(swizzlePtr[1]);
+                                swizzle.b = parse(swizzlePtr[2]);
+                                swizzle.a = parse(swizzlePtr[3]);
+                            }
+                        }
+                    }
+                    textureImages_[newTextureIdx] = std::make_unique<TextureImage>(commandPool_, width, height, miplevel, format, pixels, size, swizzle);
+#else
                     textureImages_[newTextureIdx] = std::make_unique<TextureImage>(commandPool_, width, height, miplevel, format, pixels, size);
+#endif
                 }
 
                 BindTexture(newTextureIdx, *(textureImages_[newTextureIdx]));

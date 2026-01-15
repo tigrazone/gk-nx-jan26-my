@@ -10,7 +10,7 @@
 
 namespace Assets {
 
-TextureImage::TextureImage(Vulkan::CommandPool& commandPool, size_t width, size_t height, uint32_t miplevel, VkFormat format, const unsigned char* data, uint32_t size)
+TextureImage::TextureImage(Vulkan::CommandPool& commandPool, size_t width, size_t height, uint32_t miplevel, VkFormat format, const unsigned char* data, uint32_t size, VkComponentMapping swizzle)
 {
 	// Create a host staging buffer and copy the image into it.
 	const VkDeviceSize imageSize = size;
@@ -19,7 +19,7 @@ TextureImage::TextureImage(Vulkan::CommandPool& commandPool, size_t width, size_
 	// Create the device side image, memory, view and sampler.
 	image_.reset(new Vulkan::Image(device, VkExtent2D{ static_cast<uint32_t>(width), static_cast<uint32_t>(height) }, miplevel, format));
 	imageMemory_.reset(new Vulkan::DeviceMemory(image_->AllocateMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)));
-	imageView_.reset(new Vulkan::ImageView(device, image_->Handle(), image_->Format(), VK_IMAGE_ASPECT_COLOR_BIT));
+	imageView_.reset(new Vulkan::ImageView(device, image_->Handle(), image_->Format(), VK_IMAGE_ASPECT_COLOR_BIT, miplevel, swizzle));
 	
 	Vulkan::SamplerConfig samplerConfig;
 	if (format == VK_FORMAT_R32_UINT || format == VK_FORMAT_R32_SINT)
@@ -65,14 +65,15 @@ TextureImage::TextureImage(
     const unsigned char* baseData, 
     uint32_t baseSize,
     const std::vector<std::vector<float>>& mipLevelData, 
-    const std::vector<std::pair<int, int>>& mipDimensions)
+    const std::vector<std::pair<int, int>>& mipDimensions,
+    VkComponentMapping swizzle)
 {
     const auto& device = commandPool.Device();
     
     // Create the device side image, memory, view and sampler
     image_.reset(new Vulkan::Image(device, VkExtent2D{ static_cast<uint32_t>(width), static_cast<uint32_t>(height) }, mipLevels, format));
     imageMemory_.reset(new Vulkan::DeviceMemory(image_->AllocateMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)));
-    imageView_.reset(new Vulkan::ImageView(device, image_->Handle(), image_->Format(), VK_IMAGE_ASPECT_COLOR_BIT, mipLevels));
+    imageView_.reset(new Vulkan::ImageView(device, image_->Handle(), image_->Format(), VK_IMAGE_ASPECT_COLOR_BIT, mipLevels, swizzle));
     
     // Configure sampler for mipmap levels
     Vulkan::SamplerConfig samplerConfig;

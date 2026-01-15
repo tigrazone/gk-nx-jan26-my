@@ -401,6 +401,60 @@ namespace Assets
         return -1;
     }
 
+#if WITH_KTX2
+    static VkFormat MapGlFormatToVulkan(uint32_t glFormat, bool srgb)
+    {
+        switch (glFormat)
+        {
+        case 0x8058: return srgb ? VK_FORMAT_R8G8B8A8_SRGB : VK_FORMAT_R8G8B8A8_UNORM; // GL_RGBA8
+        case 0x8C41: return VK_FORMAT_R8G8B8A8_SRGB; // GL_SRGB8_ALPHA8
+        case 0x8D64: return VK_FORMAT_ETC2_R8G8B8_UNORM_BLOCK; // GL_COMPRESSED_RGB8_ETC2
+        case 0x83F1: return srgb ? VK_FORMAT_BC1_RGBA_SRGB_BLOCK : VK_FORMAT_BC1_RGBA_UNORM_BLOCK; // GL_COMPRESSED_RGBA_S3TC_DXT1_EXT
+        case 0x83F2: return srgb ? VK_FORMAT_BC2_SRGB_BLOCK : VK_FORMAT_BC2_UNORM_BLOCK; // GL_COMPRESSED_RGBA_S3TC_DXT3_EXT
+        case 0x83F3: return srgb ? VK_FORMAT_BC3_SRGB_BLOCK : VK_FORMAT_BC3_UNORM_BLOCK; // GL_COMPRESSED_RGBA_S3TC_DXT5_EXT
+        case 0x8E8C: return VK_FORMAT_BC7_UNORM_BLOCK; // GL_COMPRESSED_RGBA_BPTC_UNORM
+        case 0x8E8D: return VK_FORMAT_BC7_SRGB_BLOCK; // GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM
+        default: return VK_FORMAT_UNDEFINED;
+        }
+    }
+
+    static void ProcessKtx(ktxTexture* kTexture, bool srgb, VkFormat& format, uint32_t& miplevel, uint8_t*& pixels, uint32_t& size, int& width, int& height)
+    {
+        if (kTexture->classId == ktxTexture2_c)
+        {
+            ktxTexture2* kTex2 = reinterpret_cast<ktxTexture2*>(kTexture);
+            if (ktxTexture2_NeedsTranscoding(kTex2))
+            {
+                ktx_error_code_e result = ktxTexture2_TranscodeBasis(kTex2, KTX_TTF_BC7_RGBA, 0);
+                if (result != KTX_SUCCESS) Throw(std::runtime_error("failed to transcode ktx2 texture image "));
+                format = srgb ? VK_FORMAT_BC7_SRGB_BLOCK : VK_FORMAT_BC7_UNORM_BLOCK;
+                miplevel = 1;
+            }
+            else
+            {
+                format = static_cast<VkFormat>(kTex2->vkFormat);
+                miplevel = kTex2->numLevels;
+            }
+        }
+        else
+        {
+            ktxTexture1* kTex1 = reinterpret_cast<ktxTexture1*>(kTexture);
+            format = MapGlFormatToVulkan(kTex1->glInternalformat, srgb);
+            miplevel = kTex1->numLevels;
+        }
+
+        pixels = ktxTexture_GetData(kTexture);
+
+        ktx_size_t offset;
+        ktxTexture_GetImageOffset(kTexture, 0, 0, 0, &offset);
+        pixels += offset;
+        size = static_cast<uint32_t>(ktxTexture_GetImageSize(kTexture, 0));
+
+        width = kTexture->baseWidth;
+        height = kTexture->baseHeight;
+    }
+#endif
+
     uint32_t GlobalTexturePool::RequestNewTextureMemAsync(const std::string& texname, const std::string& mime, bool hdr,
                                                           const unsigned char* data, size_t bytelength, bool srgb)
     {
@@ -446,7 +500,7 @@ namespace Assets
                 uint32_t miplevel = 1;
                 VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
 #if WITH_KTX2
-                ktxTexture2* kTexture = nullptr;
+                ktxTexture* kTexture = nullptr;
                 ktx_error_code_e result;
 #endif
                 VkComponentMapping swizzle = { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
@@ -495,31 +549,10 @@ namespace Assets
                 else if (mime.find("image/ktx") != std::string::npos)
                 {
 #if WITH_KTX2
-                    result = ktxTexture2_CreateFromMemory(copyedData, bytelength, KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &kTexture);
-                    if (KTX_SUCCESS != result) Throw(std::runtime_error("failed to load ktx2 texture image "));
+                    result = ktxTexture_CreateFromMemory(copyedData, bytelength, KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &kTexture);
+                    if (KTX_SUCCESS != result) Throw(std::runtime_error("failed to load ktx texture image "));
 
-                    if (ktxTexture2_NeedsTranscoding(kTexture))
-                    {
-                        result = ktxTexture2_TranscodeBasis(kTexture, KTX_TTF_BC7_RGBA, 0);
-                        if (KTX_SUCCESS != result) Throw(std::runtime_error("failed to transcode ktx2 texture image "));
-                        format = srgb ? VK_FORMAT_BC7_SRGB_BLOCK : VK_FORMAT_BC7_UNORM_BLOCK;
-                        miplevel = 1;
-                    }
-                    else
-                    {
-                        format = static_cast<VkFormat>(kTexture->vkFormat);
-                        miplevel = kTexture->numLevels;
-                    }
-
-                    pixels = ktxTexture_GetData(ktxTexture(kTexture));
-
-                    ktx_size_t offset;
-                    ktxTexture_GetImageOffset(ktxTexture(kTexture), 0, 0, 0, &offset);
-                    pixels += offset;
-                    size = static_cast<uint32_t>(ktxTexture_GetImageSize(ktxTexture(kTexture), 0));
-
-                    width = kTexture->baseWidth;
-                    height = kTexture->baseHeight;
+                    ProcessKtx(kTexture, srgb, format, miplevel, pixels, size, width, height);
 #endif
                 }
                 else
@@ -786,10 +819,10 @@ namespace Assets
                                 1, 2, 1, 1, 1,KTX_FALSE,KTX_FALSE
                             };
 
-                            result = ktxTexture2_Create(&createInfo, KTX_TEXTURE_CREATE_ALLOC_STORAGE, &kTexture);
+                            result = ktxTexture2_Create(&createInfo, KTX_TEXTURE_CREATE_ALLOC_STORAGE, reinterpret_cast<ktxTexture2**>(&kTexture));
                             if (result != KTX_SUCCESS) Throw(std::runtime_error("failed to create ktx2 image "));
 
-                            std::memcpy(ktxTexture_GetData(ktxTexture(kTexture)), stbdata, size);
+                            std::memcpy(ktxTexture_GetData(kTexture), stbdata, size);
 
                             ktxBasisParams params = {};
                             params.structSize = sizeof(params);
@@ -797,38 +830,18 @@ namespace Assets
                             params.compressionLevel = 2;
                             params.qualityLevel = 128;
                             params.threadCount = 12;
-                            result = ktxTexture2_CompressBasisEx(kTexture, &params);
+                            result = ktxTexture2_CompressBasisEx(reinterpret_cast<ktxTexture2*>(kTexture), &params);
                             if (KTX_SUCCESS != result) Throw(std::runtime_error("failed to compress ktx2 image "));
                             // save to cache
-                            ktxTexture_WriteToNamedFile(ktxTexture(kTexture), cacheFileName.c_str());
+                            ktxTexture_WriteToNamedFile(kTexture, cacheFileName.c_str());
                         }
                         else
                         {
-                            result = ktxTexture2_CreateFromNamedFile(cacheFileName.c_str(), KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &kTexture);
-                            if (result != KTX_SUCCESS) Throw(std::runtime_error("failed to load ktx2 image "));
+                            result = ktxTexture_CreateFromNamedFile(cacheFileName.c_str(), KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &kTexture);
+                            if (result != KTX_SUCCESS) Throw(std::runtime_error("failed to load ktx image "));
                         }
 
-                        if (ktxTexture2_NeedsTranscoding(kTexture))
-                        {
-                            result = ktxTexture2_TranscodeBasis(kTexture, KTX_TTF_BC7_RGBA, 0);
-                            if (result != KTX_SUCCESS) Throw(std::runtime_error("failed to transcode ktx2 image "));
-                            format = srgb ? VK_FORMAT_BC7_SRGB_BLOCK : VK_FORMAT_BC7_UNORM_BLOCK;
-                            miplevel = 1;
-                        }
-                        else
-                        {
-                            format = static_cast<VkFormat>(kTexture->vkFormat);
-                            miplevel = kTexture->numLevels;
-                        }
-
-                        pixels = ktxTexture_GetData(ktxTexture(kTexture));
-                        ktx_size_t offset;
-                        ktxTexture_GetImageOffset(ktxTexture(kTexture), 0, 0, 0, &offset);
-                        pixels += offset;
-                        size = static_cast<uint32_t>(ktxTexture_GetImageSize(ktxTexture(kTexture), 0));
-
-                        width = kTexture->baseWidth;
-                        height = kTexture->baseHeight;
+                        ProcessKtx(kTexture, srgb, format, miplevel, pixels, size, width, height);
 #endif
                     }
                 }
@@ -841,7 +854,7 @@ namespace Assets
                     {
                         ktx_uint8_t* swizzlePtr;
                         unsigned int swizzleLen;
-                        if (ktxHashList_FindValue(&ktxTexture(kTexture)->kvDataHead, KTX_SWIZZLE_KEY, &swizzleLen, (void**)&swizzlePtr) == KTX_SUCCESS) {
+                        if (ktxHashList_FindValue(&kTexture->kvDataHead, KTX_SWIZZLE_KEY, &swizzleLen, (void**)&swizzlePtr) == KTX_SUCCESS) {
                             auto parse = [](char c) {
                                 if (c == 'r') return VK_COMPONENT_SWIZZLE_R;
                                 if (c == 'g') return VK_COMPONENT_SWIZZLE_G;
@@ -869,7 +882,7 @@ namespace Assets
                 if (stbdata) stbi_image_free(stbdata);
                 
 #if WITH_KTX2
-                if (kTexture) ktxTexture_Destroy(ktxTexture(kTexture));
+                if (kTexture) ktxTexture_Destroy(kTexture);
 #endif
                 
                 // transfer

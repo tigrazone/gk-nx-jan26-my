@@ -538,7 +538,7 @@ bool NextEngine::Tick()
     if (progressiveRendering_)
     {
         accumulatedFrames_++;
-        if(accumulatedFrames_ > userSettings_.TemporalFrames * 10 && totalFrames_ > accumulatedFrames_) {
+        if(accumulatedFrames_ > userSettings_.TemporalFrames * 2 && totalFrames_ > accumulatedFrames_) {
             renderer_->SetFrameCount(accumulatedFrames_);
         }
     }

@@ -449,6 +449,7 @@ namespace Assets
                 ktxTexture2* kTexture = nullptr;
                 ktx_error_code_e result;
 #endif
+                VkComponentMapping swizzle = { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
                 // load from dds
                 bool isDDS = (mime.find("image/dds") != std::string::npos) || (bytelength > 128 && *(uint32_t*)copyedData == 0x20534444);
                 if (isDDS)
@@ -501,6 +502,13 @@ namespace Assets
                     {
                         result = ktxTexture2_TranscodeBasis(kTexture, KTX_TTF_BC7_RGBA, 0);
                         if (KTX_SUCCESS != result) Throw(std::runtime_error("failed to transcode ktx2 texture image "));
+                        format = srgb ? VK_FORMAT_BC7_SRGB_BLOCK : VK_FORMAT_BC7_UNORM_BLOCK;
+                        miplevel = 1;
+                    }
+                    else
+                    {
+                        format = static_cast<VkFormat>(kTexture->vkFormat);
+                        miplevel = kTexture->numLevels;
                     }
 
                     pixels = ktxTexture_GetData(ktxTexture(kTexture));
@@ -510,10 +518,8 @@ namespace Assets
                     pixels += offset;
                     size = static_cast<uint32_t>(ktxTexture_GetImageSize(ktxTexture(kTexture), 0));
 
-                    format = static_cast<VkFormat>(kTexture->vkFormat);
                     width = kTexture->baseWidth;
                     height = kTexture->baseHeight;
-                    miplevel = kTexture->numLevels;
 #endif
                 }
                 else
@@ -646,7 +652,7 @@ namespace Assets
                                             {
                                                 textureImages_[newTextureIdx] = std::make_unique<TextureImage>(
                                                     commandPool_, width, height, miplevel, format,
-                                                    pixels, size, mipLevels, mipDimensions);
+                                                    pixels, size, mipLevels, mipDimensions, swizzle);
                                                 cacheLoaded = true;
                                             }
                                         }
@@ -755,7 +761,7 @@ namespace Assets
 
                             textureImages_[newTextureIdx] = std::make_unique<TextureImage>(
                                 commandPool_, width, height, miplevel, format,
-                                pixels, size, mipLevels, mipDimensions);
+                                pixels, size, mipLevels, mipDimensions, swizzle);
                         }
                     }
                     else
@@ -802,9 +808,18 @@ namespace Assets
                             if (result != KTX_SUCCESS) Throw(std::runtime_error("failed to load ktx2 image "));
                         }
 
-                        // next
-                        result = ktxTexture2_TranscodeBasis(kTexture, KTX_TTF_BC7_RGBA, 0);
-                        if (result != KTX_SUCCESS) Throw(std::runtime_error("failed to transcode ktx2 image "));
+                        if (ktxTexture2_NeedsTranscoding(kTexture))
+                        {
+                            result = ktxTexture2_TranscodeBasis(kTexture, KTX_TTF_BC7_RGBA, 0);
+                            if (result != KTX_SUCCESS) Throw(std::runtime_error("failed to transcode ktx2 image "));
+                            format = srgb ? VK_FORMAT_BC7_SRGB_BLOCK : VK_FORMAT_BC7_UNORM_BLOCK;
+                            miplevel = 1;
+                        }
+                        else
+                        {
+                            format = static_cast<VkFormat>(kTexture->vkFormat);
+                            miplevel = kTexture->numLevels;
+                        }
 
                         pixels = ktxTexture_GetData(ktxTexture(kTexture));
                         ktx_size_t offset;
@@ -812,10 +827,8 @@ namespace Assets
                         pixels += offset;
                         size = static_cast<uint32_t>(ktxTexture_GetImageSize(ktxTexture(kTexture), 0));
 
-                        format = srgb ? VK_FORMAT_BC7_SRGB_BLOCK : VK_FORMAT_BC7_UNORM_BLOCK;
                         width = kTexture->baseWidth;
                         height = kTexture->baseHeight;
-                        miplevel = 1;
 #endif
                     }
                 }
@@ -824,7 +837,6 @@ namespace Assets
                 if (!hdr)
                 {
 #if WITH_KTX2
-                    VkComponentMapping swizzle = { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
                     if (kTexture) // Only attempt to read swizzle if kTexture was loaded/created
                     {
                         ktx_uint8_t* swizzlePtr;
@@ -847,10 +859,8 @@ namespace Assets
                             }
                         }
                     }
-                    textureImages_[newTextureIdx] = std::make_unique<TextureImage>(commandPool_, width, height, miplevel, format, pixels, size, swizzle);
-#else
-                    textureImages_[newTextureIdx] = std::make_unique<TextureImage>(commandPool_, width, height, miplevel, format, pixels, size);
 #endif
+                    textureImages_[newTextureIdx] = std::make_unique<TextureImage>(commandPool_, width, height, miplevel, format, pixels, size, swizzle);
                 }
 
                 BindTexture(newTextureIdx, *(textureImages_[newTextureIdx]));

@@ -143,7 +143,8 @@ void TextureImage::UpdateDataMainThread(
     uint32_t sourceWidth,
     uint32_t sourceHeight,
     const unsigned char* data,
-    uint32_t size)
+    uint32_t size,
+    uint32_t mipLevel)
 {
     const auto& device = commandPool.Device();
 
@@ -162,12 +163,12 @@ void TextureImage::UpdateDataMainThread(
 
     // 定义复制区域
     VkBufferImageCopy region{};
-    region.bufferOffset = (sourceWidth * startY + startX) * 4;  // 4 bytes per pixel
-    region.bufferRowLength = sourceWidth;  // 紧凑排列
-    region.bufferImageHeight = sourceHeight;  // 紧凑排列
+    region.bufferOffset = 0; // Мы копируем весь подготовленный буфер для данного уровня
+    region.bufferRowLength = 0;  // 0 означает плотное прилегание согласно extent
+    region.bufferImageHeight = 0;  // 0 означает плотное прилегание согласно extent
 
     region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    region.imageSubresource.mipLevel = 0;
+    region.imageSubresource.mipLevel = mipLevel;
     region.imageSubresource.baseArrayLayer = 0;
     region.imageSubresource.layerCount = 1;
 
@@ -186,9 +187,6 @@ void TextureImage::UpdateDataMainThread(
             &region);
     });
 
-    // 复制完成后，将图像转换回着色器只读布局
-    image_->TransitionImageLayout(commandPool, VK_IMAGE_LAYOUT_GENERAL);
-
     // 清理临时资源
     stagingBuffer.reset();
 }
@@ -203,4 +201,5 @@ void TextureImage::MainThreadPostLoading(Vulkan::CommandPool& commandPool)
 {
 	image_->TransitionImageLayout(commandPool, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }
-}
+
+} // namespace Assets

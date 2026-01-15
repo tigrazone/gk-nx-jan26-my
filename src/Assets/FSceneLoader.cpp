@@ -320,6 +320,16 @@ namespace Assets
             }
         }
 
+        // Log all textures in the model
+        SPDLOG_INFO("glTF Model info: {} images, {} textures, {} materials", 
+                    model.images.size(), model.textures.size(), model.materials.size());
+        for (size_t i = 0; i < model.textures.size(); ++i) {
+            int imageIdx = model.textures[i].source;
+            if (imageIdx != -1 && imageIdx < (int)model.images.size()) {
+                SPDLOG_INFO("Texture {}: Image {} ({})", i, imageIdx, model.images[imageIdx].uri);
+            }
+        }
+
         // delayed texture creation
         textureIdMap.resize(model.images.size(), -1);
         auto lambdaLoadTexture = [&textureIdMap, &model, filepath](int texture, bool srgb)
@@ -366,11 +376,37 @@ namespace Assets
             return -1;
         };
         
-        for (tinygltf::Material& mat : model.materials)
+        for (int i = 0; i < model.materials.size(); i++)
         {
-            lambdaLoadTexture(mat.pbrMetallicRoughness.baseColorTexture.index, true);
-            lambdaLoadTexture(mat.pbrMetallicRoughness.metallicRoughnessTexture.index, false);
-            lambdaLoadTexture(mat.normalTexture.index, false);
+            auto& mat = model.materials[i];
+            SPDLOG_INFO("Processing Material {}: '{}'", i, mat.name);
+            for (auto& ext : mat.extensions) {
+                SPDLOG_INFO("  - Extension: {}", ext.first);
+            }
+
+            if (mat.pbrMetallicRoughness.baseColorTexture.index != -1) {
+                SPDLOG_INFO("  - BaseColorTexture index: {}", mat.pbrMetallicRoughness.baseColorTexture.index);
+                lambdaLoadTexture(mat.pbrMetallicRoughness.baseColorTexture.index, true);
+            }
+
+            auto specGloss = mat.extensions.find("KHR_materials_pbrSpecularGlossiness");
+            if (specGloss != mat.extensions.end()) {
+                auto& sg = specGloss->second;
+                if (sg.Has("diffuseTexture")) {
+                    int texIdx = sg.Get("diffuseTexture").Get("index").GetNumberAsInt();
+                    SPDLOG_INFO("  - SpecGloss DiffuseTexture index: {}", texIdx);
+                    lambdaLoadTexture(texIdx, true);
+                }
+            }
+
+            if (mat.pbrMetallicRoughness.metallicRoughnessTexture.index != -1) {
+                SPDLOG_INFO("  - MetallicRoughnessTexture index: {}", mat.pbrMetallicRoughness.metallicRoughnessTexture.index);
+                lambdaLoadTexture(mat.pbrMetallicRoughness.metallicRoughnessTexture.index, false);
+            }
+            if (mat.normalTexture.index != -1) {
+                SPDLOG_INFO("  - NormalTexture index: {}", mat.normalTexture.index);
+                lambdaLoadTexture(mat.normalTexture.index, false);
+            }
         }
         
         // load all materials
@@ -392,9 +428,6 @@ namespace Assets
             m.DiffuseTextureId = lambdaGetTexture( mat.pbrMetallicRoughness.baseColorTexture.index );
             m.MRATextureId = lambdaGetTexture(mat.pbrMetallicRoughness.metallicRoughnessTexture.index); // metallic in B, roughness in G
             
-            m.NormalTextureId = lambdaGetTexture(mat.normalTexture.index);
-            m.NormalTextureScale = static_cast<float>(mat.normalTexture.scale);
-            
             glm::vec3 emissiveColor = mat.emissiveFactor.empty()
                                           ? glm::vec3(0)
                                           : glm::vec3(mat.emissiveFactor[0], mat.emissiveFactor[1],
@@ -404,6 +437,22 @@ namespace Assets
                                          : glm::vec3(mat.pbrMetallicRoughness.baseColorFactor[0],
                                                      mat.pbrMetallicRoughness.baseColorFactor[1],
                                                      mat.pbrMetallicRoughness.baseColorFactor[2]);
+
+            auto specGloss = mat.extensions.find("KHR_materials_pbrSpecularGlossiness");
+            if (specGloss != mat.extensions.end()) {
+                auto& sg = specGloss->second;
+                if (sg.Has("diffuseTexture")) {
+                    int texIdx = sg.Get("diffuseTexture").Get("index").GetNumberAsInt();
+                    m.DiffuseTextureId = lambdaGetTexture(texIdx);
+                }
+                if (sg.Has("diffuseFactor")) {
+                    auto factor = sg.Get("diffuseFactor");
+                    diffuseColor = glm::vec3(factor.Get(0).GetNumberAsDouble(), factor.Get(1).GetNumberAsDouble(), factor.Get(2).GetNumberAsDouble());
+                }
+            }
+
+            m.NormalTextureId = lambdaGetTexture(mat.normalTexture.index);
+            m.NormalTextureScale = static_cast<float>(mat.normalTexture.scale);
 
             m.Diffuse = glm::vec4(sqrt(diffuseColor), 1.0);
 

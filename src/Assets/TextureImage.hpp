@@ -56,7 +56,8 @@ namespace Assets
 			uint32_t sourcewidth,
 			uint32_t sourceheight,
 			const unsigned char* data,
-			uint32_t size);
+			uint32_t size,
+			uint32_t mipLevel = 0);
 
 		void SetDebugName(const std::string& name);
 

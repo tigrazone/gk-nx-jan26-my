@@ -417,6 +417,106 @@ namespace Assets
         default: return VK_FORMAT_UNDEFINED;
         }
     }
+#endif
+
+    // Map DXGI format to Vulkan format for DDS textures
+    static VkFormat MapDxgiFormatToVulkan(uint32_t dxgiFormat, bool srgb, VkComponentMapping& swizzle)
+    {
+        // Explicit RGBA swizzle instead of identity to be safe
+        swizzle = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, 
+                    VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A };
+
+        switch (dxgiFormat)
+        {
+            // Uncompressed RGBA formats
+            case 28: // DXGI_FORMAT_R8G8B8A8_UNORM
+                return srgb ? VK_FORMAT_R8G8B8A8_SRGB : VK_FORMAT_R8G8B8A8_UNORM;
+            case 29: // DXGI_FORMAT_R8G8B8A8_UNORM_SRGB
+                return VK_FORMAT_R8G8B8A8_SRGB;
+            
+            // BGRA formats (Vulkan interprets as BGRA natively)
+            case 87: // DXGI_FORMAT_B8G8R8A8_UNORM
+                return srgb ? VK_FORMAT_B8G8R8A8_SRGB : VK_FORMAT_B8G8R8A8_UNORM;
+            case 91: // DXGI_FORMAT_B8G8R8A8_UNORM_SRGB
+                return VK_FORMAT_B8G8R8A8_SRGB;
+            
+            // Single and dual channel formats
+            case 61: // DXGI_FORMAT_R8_UNORM
+                swizzle = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_ONE };
+                return VK_FORMAT_R8_UNORM;
+            case 49: // DXGI_FORMAT_R8G8_UNORM
+                return VK_FORMAT_R8G8_UNORM;
+            
+            // BC1 (DXT1)
+            case 71: // DXGI_FORMAT_BC1_UNORM
+                return srgb ? VK_FORMAT_BC1_RGBA_SRGB_BLOCK : VK_FORMAT_BC1_RGBA_UNORM_BLOCK;
+            case 72: // DXGI_FORMAT_BC1_UNORM_SRGB
+                return VK_FORMAT_BC1_RGBA_SRGB_BLOCK;
+            
+            // BC2 (DXT3)
+            case 74: // DXGI_FORMAT_BC2_UNORM
+                return srgb ? VK_FORMAT_BC2_SRGB_BLOCK : VK_FORMAT_BC2_UNORM_BLOCK;
+            case 75: // DXGI_FORMAT_BC2_UNORM_SRGB
+                return VK_FORMAT_BC2_SRGB_BLOCK;
+            
+            // BC3 (DXT5)
+            case 77: // DXGI_FORMAT_BC3_UNORM
+                return srgb ? VK_FORMAT_BC3_SRGB_BLOCK : VK_FORMAT_BC3_UNORM_BLOCK;
+            case 78: // DXGI_FORMAT_BC3_UNORM_SRGB
+                return VK_FORMAT_BC3_SRGB_BLOCK;
+            
+            // BC4 (single channel)
+            case 80: // DXGI_FORMAT_BC4_UNORM
+                swizzle = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_ONE };
+                return VK_FORMAT_BC4_UNORM_BLOCK;
+            case 81: // DXGI_FORMAT_BC4_SNORM
+                swizzle = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_ONE };
+                return VK_FORMAT_BC4_SNORM_BLOCK;
+            
+            // BC5 (dual channel)
+            case 82: // DXGI_FORMAT_BC5_TYPELESS
+            case 83: // DXGI_FORMAT_BC5_UNORM
+            case 84: // DXGI_FORMAT_BC5_SNORM
+                swizzle = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, 
+                            VK_COMPONENT_SWIZZLE_ZERO, VK_COMPONENT_SWIZZLE_ONE };
+                return VK_FORMAT_BC5_UNORM_BLOCK;
+            
+            // BC6H (HDR)
+            case 95: // DXGI_FORMAT_BC6H_UF16
+                return VK_FORMAT_BC6H_UFLOAT_BLOCK;
+            case 96: // DXGI_FORMAT_BC6H_SF16
+                return VK_FORMAT_BC6H_SFLOAT_BLOCK;
+            
+            // BC7
+            case 98: // DXGI_FORMAT_BC7_UNORM
+                return srgb ? VK_FORMAT_BC7_SRGB_BLOCK : VK_FORMAT_BC7_UNORM_BLOCK;
+            case 99: // DXGI_FORMAT_BC7_UNORM_SRGB
+                return VK_FORMAT_BC7_SRGB_BLOCK;
+
+            
+            // Floating point formats
+            case 2: // DXGI_FORMAT_R32G32B32A32_FLOAT
+                return VK_FORMAT_R32G32B32A32_SFLOAT;
+            case 10: // DXGI_FORMAT_R16G16B16A16_FLOAT
+                return VK_FORMAT_R16G16B16A16_SFLOAT;
+            case 41: // DXGI_FORMAT_R32_FLOAT
+                return VK_FORMAT_R32_SFLOAT;
+            case 54: // DXGI_FORMAT_R16_FLOAT
+                return VK_FORMAT_R16_SFLOAT;
+            
+            // 16-bit formats
+            case 56: // DXGI_FORMAT_R16G16B16A16_UNORM
+                return VK_FORMAT_R16G16B16A16_UNORM;
+            case 57: // DXGI_FORMAT_R16G16B16A16_SNORM
+                return VK_FORMAT_R16G16B16A16_SNORM;
+            
+            default:
+                SPDLOG_WARN("Unknown DXGI format: {}, using VK_FORMAT_UNDEFINED", dxgiFormat);
+                return VK_FORMAT_UNDEFINED;
+        }
+    }
+
+#if WITH_KTX2
 
     static void ProcessKtx(ktxTexture* kTexture, bool srgb, VkFormat& format, uint32_t& miplevel, uint8_t*& pixels, uint32_t& size, int& width, int& height)
     {
@@ -520,14 +620,43 @@ namespace Assets
                     auto* header = (DDS_HEADER*)(copyedData + 4);
                     width = header->dwWidth;
                     height = header->dwHeight;
-                    miplevel = 1; 
+                    
+                    // Properly handle mipmap levels
+                    // dwFlags & 0x20000 = DDSD_MIPMAPCOUNT
+                    miplevel = (header->dwFlags & 0x20000) ? std::max(1u, header->dwMipMapCount) : 1;
+                    
                     pixels = copyedData + 4 + header->dwSize;
 
+                    // Process FourCC formats
                     if (header->ddspf.dwFlags & 0x4) { // DDPF_FOURCC
                         switch (header->ddspf.dwFourCC) {
-                        case 0x31545844: format = srgb ? VK_FORMAT_BC1_RGBA_SRGB_BLOCK : VK_FORMAT_BC1_RGBA_UNORM_BLOCK; break; // DXT1
-                        case 0x33545844: format = srgb ? VK_FORMAT_BC2_SRGB_BLOCK : VK_FORMAT_BC2_UNORM_BLOCK; break;      // DXT3
-                        case 0x35545844: format = srgb ? VK_FORMAT_BC3_SRGB_BLOCK : VK_FORMAT_BC3_UNORM_BLOCK; break;      // DXT5
+                        case 0x31545844: // DXT1
+                            format = srgb ? VK_FORMAT_BC1_RGBA_SRGB_BLOCK : VK_FORMAT_BC1_RGBA_UNORM_BLOCK;
+                            break;
+                        case 0x33545844: // DXT3
+                            format = srgb ? VK_FORMAT_BC2_SRGB_BLOCK : VK_FORMAT_BC2_UNORM_BLOCK;
+                            break;
+                        case 0x35545844: // DXT5
+                            format = srgb ? VK_FORMAT_BC3_SRGB_BLOCK : VK_FORMAT_BC3_UNORM_BLOCK;
+                            break;
+                        case 0x55344342: // BC4U
+                        case 0x31495441: // ATI1
+                            format = VK_FORMAT_BC4_UNORM_BLOCK;
+                            swizzle = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_ONE };
+                            break;
+                        case 0x53344342: // BC4S
+                            format = VK_FORMAT_BC4_SNORM_BLOCK;
+                            swizzle = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_ONE };
+                            break;
+                        case 0x55354342: // BC5U
+                        case 0x32495441: // ATI2
+                            format = VK_FORMAT_BC5_UNORM_BLOCK;
+                            swizzle = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_ZERO, VK_COMPONENT_SWIZZLE_ONE };
+                            break;
+                        case 0x53354342: // BC5S
+                            format = VK_FORMAT_BC5_SNORM_BLOCK;
+                            swizzle = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_ZERO, VK_COMPONENT_SWIZZLE_ONE };
+                            break;
                         case 0x30315844: // DX10
                         {
                             struct DDS_HEADER_DXT10 {
@@ -535,15 +664,78 @@ namespace Assets
                             };
                             auto* header10 = (DDS_HEADER_DXT10*)pixels;
                             pixels += sizeof(DDS_HEADER_DXT10);
-                            if (header10->dxgiFormat == 98) format = VK_FORMAT_BC7_UNORM_BLOCK;
-                            else if (header10->dxgiFormat == 99) format = VK_FORMAT_BC7_SRGB_BLOCK;
-                            else if (header10->dxgiFormat == 95) format = VK_FORMAT_BC6H_UFLOAT_BLOCK;
-                            else if (header10->dxgiFormat == 96) format = VK_FORMAT_BC6H_SFLOAT_BLOCK;
+                            
+                            format = MapDxgiFormatToVulkan(header10->dxgiFormat, srgb, swizzle);
+                            
+                            if (format == VK_FORMAT_UNDEFINED) {
+                                SPDLOG_ERROR("Unsupported DXGI format {} in DDS file: {}", header10->dxgiFormat, texname);
+                                format = srgb ? VK_FORMAT_R8G8B8A8_SRGB : VK_FORMAT_R8G8B8A8_UNORM;
+                            }
                             break;
                         }
+                        default:
+                            SPDLOG_WARN("Unknown DDS FourCC: 0x{:08X} in file: {}", header->ddspf.dwFourCC, texname);
+                            format = srgb ? VK_FORMAT_R8G8B8A8_SRGB : VK_FORMAT_R8G8B8A8_UNORM;
+                            break;
                         }
                     }
+                    
+                    // Process uncompressed and luminance formats
+                    // Note: Use independent if/else or flags to avoid skipping Luminance if RGB is set
+                    uint32_t pfFlags = header->ddspf.dwFlags;
+                    if (!(pfFlags & 0x4)) { // NOT FourCC
+                        if (pfFlags & 0x20000) { // DDPF_LUMINANCE
+                            if (header->ddspf.dwRGBBitCount == 8) {
+                                format = VK_FORMAT_R8_UNORM;
+                                swizzle = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_ONE };
+                            } else if (header->ddspf.dwRGBBitCount == 16) {
+                                format = VK_FORMAT_R8G8_UNORM;
+                                swizzle = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G };
+                            }
+                            SPDLOG_INFO("DDS Luminance: {}, format: {}", texname, (int)format);
+                        }
+                        else if (pfFlags & 0x2) { // DDPF_ALPHA
+                            format = VK_FORMAT_R8_UNORM;
+                            swizzle = { VK_COMPONENT_SWIZZLE_ZERO, VK_COMPONENT_SWIZZLE_ZERO, VK_COMPONENT_SWIZZLE_ZERO, VK_COMPONENT_SWIZZLE_R };
+                            SPDLOG_INFO("DDS Alpha-only: {}, format: {}", texname, (int)format);
+                        }
+                        else if (pfFlags & 0x40) { // DDPF_RGB
+                            if (header->ddspf.dwRGBBitCount == 32) {
+                                if (header->ddspf.dwRBitMask == 0x00FF0000 && header->ddspf.dwBBitMask == 0x000000FF) {
+                                    format = srgb ? VK_FORMAT_B8G8R8A8_SRGB : VK_FORMAT_B8G8R8A8_UNORM;
+                                } else {
+                                    format = srgb ? VK_FORMAT_R8G8B8A8_SRGB : VK_FORMAT_R8G8B8A8_UNORM;
+                                }
+                            } else if (header->ddspf.dwRGBBitCount == 24) {
+                                SPDLOG_INFO("Converting 24-bit RGB DDS to 32-bit RGBA: {}", texname);
+                                uint32_t pixelCount = width * height;
+                                uint32_t newSize = pixelCount * 4;
+                                uint8_t* rgbaPixels = new uint8_t[newSize];
+                                uint32_t i3 = 0, i4 = 0;
+                                for (uint32_t i = 0; i < pixelCount; ++i) {
+                                    rgbaPixels[i4] = pixels[i3];
+                                    rgbaPixels[i4 + 1] = pixels[i3 + 1];
+                                    rgbaPixels[i4 + 2] = pixels[i3 + 2];
+                                    rgbaPixels[i4 + 3] = 255;
+                                    i3 += 3; i4 += 4;
+                                }
+                                stbdata = rgbaPixels; // Use stbdata for automatic cleanup later
+                                pixels = rgbaPixels;
+                                size = newSize;
+                                format = srgb ? VK_FORMAT_R8G8B8A8_SRGB : VK_FORMAT_R8G8B8A8_UNORM;
+                            } else if (header->ddspf.dwRGBBitCount == 16) {
+                                format = VK_FORMAT_R5G6B5_UNORM_PACK16;
+                            }
+                            SPDLOG_INFO("DDS RGB: {}, bitCount: {}, format: {}", texname, header->ddspf.dwRGBBitCount, (int)format);
+                        }
+                    }
+                    
+                    // Calculate data size
                     size = bytelength - static_cast<uint32_t>(pixels - copyedData);
+                    
+                    SPDLOG_INFO("Loaded DDS: {} ({}x{}, {} mips, format: {}, srgb: {}, swizzle: [{},{},{},{}])", 
+                                texname, width, height, miplevel, static_cast<int>(format), srgb,
+                                (int)swizzle.r, (int)swizzle.g, (int)swizzle.b, (int)swizzle.a);
                 }
                 // load from ktx inside glb
                 else if (mime.find("image/ktx") != std::string::npos)
@@ -846,6 +1038,18 @@ namespace Assets
                     }
                 }
 
+                // load from memory using stb
+                if (stbdata)
+                {
+                    SPDLOG_INFO("Loaded STB from memory: {} ({}x{}, format: {}, srgb: {})", 
+                                texname, width, height, static_cast<int>(format), srgb);
+                }
+                else if (kTexture)
+                {
+                    SPDLOG_INFO("Loaded KTX from memory: {} ({}x{}, mips: {}, format: {})", 
+                                texname, width, height, miplevel, static_cast<int>(format));
+                }
+
                 // create texture image
                 if (!hdr)
                 {
@@ -873,43 +1077,81 @@ namespace Assets
                         }
                     }
 #endif
+                if (isDDS && miplevel > 1)
+                {
+                    // Create image with all mips
+                    textureImages_[newTextureIdx] = std::make_unique<TextureImage>(commandPool_, width, height, miplevel, format, nullptr, 0, swizzle);
+                    
+                    // Upload all mips
+                    uint32_t currWidth = width;
+                    uint32_t currHeight = height;
+                    const uint8_t* currData = pixels;
+                    
+                    for (uint32_t level = 0; level < miplevel; ++level)
+                    {
+                        uint32_t mipSize = 0;
+                        if (format >= VK_FORMAT_BC1_RGB_UNORM_BLOCK && format <= VK_FORMAT_BC7_SRGB_BLOCK) {
+                            uint32_t blockWidth = (currWidth + 3) / 4;
+                            uint32_t blockHeight = (currHeight + 3) / 4;
+                            uint32_t blockSize = (format == VK_FORMAT_BC1_RGB_UNORM_BLOCK || format == VK_FORMAT_BC1_RGB_SRGB_BLOCK || 
+                                                 format == VK_FORMAT_BC1_RGBA_UNORM_BLOCK || format == VK_FORMAT_BC1_RGBA_SRGB_BLOCK ||
+                                                 format == VK_FORMAT_BC4_UNORM_BLOCK || format == VK_FORMAT_BC4_SNORM_BLOCK) ? 8 : 16;
+                            mipSize = blockWidth * blockHeight * blockSize;
+                        } else {
+                            // Assume 4 bytes per pixel for uncompressed (RGBA8/BGRA8)
+                            mipSize = currWidth * currHeight * 4;
+                        }
+                        
+                        // Safety check
+                        if (currData + mipSize <= copyedData + bytelength + (stbdata != nullptr ? width*height*4 : 0)) {
+                            textureImages_[newTextureIdx]->UpdateDataMainThread(commandPool_, 0, 0, currWidth, currHeight, currWidth, currHeight, currData, mipSize, level);
+                        }
+                        
+                        currData += mipSize;
+                        currWidth = std::max(1u, currWidth / 2);
+                        currHeight = std::max(1u, currHeight / 2);
+                    }
+                }
+                else
+                {
                     textureImages_[newTextureIdx] = std::make_unique<TextureImage>(commandPool_, width, height, miplevel, format, pixels, size, swizzle);
                 }
+            }
 
-                BindTexture(newTextureIdx, *(textureImages_[newTextureIdx]));
+        BindTexture(newTextureIdx, *(textureImages_[newTextureIdx]));
 
-                // clean up
-                if (stbdata) stbi_image_free(stbdata);
-                
+        // clean up
+        if (stbdata) stbi_image_free(stbdata);
+        
 #if WITH_KTX2
-                if (kTexture) ktxTexture_Destroy(kTexture);
+        if (kTexture) ktxTexture_Destroy(kTexture);
 #endif
-                
-                // transfer
-                taskContext.textureId = newTextureIdx;
-                taskContext.needFlushHDRSH = hdr;
-                taskContext.elapsed = std::chrono::duration<float, std::chrono::seconds::period>(
-                    std::chrono::high_resolution_clock::now() - timer).count();
-                std::string info = fmt::format("loaded {} ({} x {} x {}) in {:.2f}ms", texname, width, height, miplevel,
-                                               taskContext.elapsed * 1000.f);
-                std::copy(info.begin(), info.end(), taskContext.outputInfo.data());
-                task.SetContext(taskContext);
-            }, [this, copyedData](ResTask& task)
-            {
-                TextureTaskContext taskContext{};
-                task.GetContext(taskContext);
-                textureImages_[taskContext.textureId]->MainThreadPostLoading(mainThreadCommandPool_);
-                //SPDLOG_INFO("{}", taskContext.outputInfo.data());
-                delete[] copyedData;
+        
+        // transfer
+        taskContext.textureId = newTextureIdx;
+        taskContext.needFlushHDRSH = hdr;
+        taskContext.elapsed = std::chrono::duration<float, std::chrono::seconds::period>(
+            std::chrono::high_resolution_clock::now() - timer).count();
+        std::string info = fmt::format("loaded {} ({} x {} x {}) in {:.2f}ms", texname, width, height, miplevel,
+                                       taskContext.elapsed * 1000.f);
+        std::copy(info.begin(), info.end(), taskContext.outputInfo.data());
+        task.SetContext(taskContext);
+    }, [this, copyedData](ResTask& task)
+    {
+        TextureTaskContext taskContext{};
+        task.GetContext(taskContext);
+        textureImages_[taskContext.textureId]->MainThreadPostLoading(mainThreadCommandPool_);
+        //SPDLOG_INFO("{}", taskContext.outputInfo.data());
+        delete[] copyedData;
 
-                if (taskContext.needFlushHDRSH)
-                {
-                    NextEngine::GetInstance()->GetScene().UpdateHDRSH();
-                }
-            }, 0);
+        if (taskContext.needFlushHDRSH)
+        {
+            NextEngine::GetInstance()->GetScene().UpdateHDRSH();
+        }
+    }, 0);
 
-        return newTextureIdx;
-    }
+    return newTextureIdx;
+}
 
     void GlobalTexturePool::FreeNonSystemTextures()
     {

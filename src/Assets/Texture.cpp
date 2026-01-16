@@ -518,7 +518,7 @@ namespace Assets
 
 #if WITH_KTX2
 
-    static void ProcessKtx(ktxTexture* kTexture, bool srgb, VkFormat& format, uint32_t& miplevel, uint8_t*& pixels, uint32_t& size, int& width, int& height)
+    static void ProcessKtx(ktxTexture* kTexture, bool srgb, VkFormat& format, uint32_t& miplevel, uint8_t*& pixels, uint32_t& size, int& width, int& height, const std::string& texname)
     {
         if (kTexture->classId == ktxTexture2_c)
         {
@@ -526,7 +526,10 @@ namespace Assets
             if (ktxTexture2_NeedsTranscoding(kTex2))
             {
                 ktx_error_code_e result = ktxTexture2_TranscodeBasis(kTex2, KTX_TTF_BC7_RGBA, 0);
-                if (result != KTX_SUCCESS) Throw(std::runtime_error("failed to transcode ktx2 texture image "));
+                if (result != KTX_SUCCESS)
+                {
+                    SPDLOG_WARN("load texture {} failed.", texname);
+                }
                 format = srgb ? VK_FORMAT_BC7_SRGB_BLOCK : VK_FORMAT_BC7_UNORM_BLOCK;
                 miplevel = 1;
             }
@@ -742,9 +745,12 @@ namespace Assets
                 {
 #if WITH_KTX2
                     result = ktxTexture_CreateFromMemory(copyedData, bytelength, KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &kTexture);
-                    if (KTX_SUCCESS != result) Throw(std::runtime_error("failed to load ktx texture image "));
+                    if (KTX_SUCCESS != result)
+                    {
+                        SPDLOG_WARN("load texture {} failed.", texname);
+                    }
 
-                    ProcessKtx(kTexture, srgb, format, miplevel, pixels, size, width, height);
+                    ProcessKtx(kTexture, srgb, format, miplevel, pixels, size, width, height, texname);
 #endif
                 }
                 else
@@ -1058,7 +1064,10 @@ namespace Assets
                             };
 
                             result = ktxTexture2_Create(&createInfo, KTX_TEXTURE_CREATE_ALLOC_STORAGE, reinterpret_cast<ktxTexture2**>(&kTexture));
-                            if (result != KTX_SUCCESS) Throw(std::runtime_error("failed to create ktx2 image "));
+                            if (result != KTX_SUCCESS)
+                            {
+                                SPDLOG_WARN("load texture {} failed.", texname);
+                            }
 
                             std::memcpy(ktxTexture_GetData(kTexture), stbdata, size);
 
@@ -1069,17 +1078,23 @@ namespace Assets
                             params.qualityLevel = 128;      // 255 max, better quality
                             params.threadCount = std::thread::hardware_concurrency();
                             result = ktxTexture2_CompressBasisEx(reinterpret_cast<ktxTexture2*>(kTexture), &params);
-                            if (KTX_SUCCESS != result) Throw(std::runtime_error("failed to compress ktx2 image "));
+                            if (KTX_SUCCESS != result)
+                            {
+                                SPDLOG_WARN("failed to compress ktx2 image");
+                            }
                             // save to cache
                             ktxTexture_WriteToNamedFile(kTexture, cacheFileName.c_str());
                         }
                         else
                         {
                             result = ktxTexture_CreateFromNamedFile(cacheFileName.c_str(), KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &kTexture);
-                            if (result != KTX_SUCCESS) Throw(std::runtime_error("failed to load ktx image "));
+                            if (result != KTX_SUCCESS)
+                            {
+                                SPDLOG_WARN("load texture {} failed.", texname);
+                            }
                         }
 
-                        ProcessKtx(kTexture, srgb, format, miplevel, pixels, size, width, height);
+                        ProcessKtx(kTexture, srgb, format, miplevel, pixels, size, width, height, texname);
 #endif
                     }
                 }

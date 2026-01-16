@@ -998,9 +998,45 @@ namespace Assets
                         if (!std::filesystem::exists(cacheFileName))
                         {
                             // load from stbi and compress to ktx and cache
-                            stbdata = stbi_load_from_memory(copyedData, static_cast<uint32_t>(bytelength), &width, &height, &channels, STBI_rgb_alpha);
-                            format = srgb ? VK_FORMAT_R8G8B8A8_SRGB : VK_FORMAT_R8G8B8A8_UNORM;
-                            size = width * height * 4 * sizeof(uint8_t);
+                            if(!stbi_info_from_memory(copyedData, static_cast<uint32_t>(bytelength), &width, &height, &channels))
+                            {
+                                // LOGW("Failed to get info using stb_image for image %" PRIu64 "\n", imageID);
+                            }
+
+                            // Read the header again to check if it has 16 bit data, e.g. for a heightmap.
+                            const bool is16Bit = stbi_is_16_bit_from_memory(copyedData, static_cast<uint32_t>(bytelength));
+
+                            // Load the image
+                            int      requiredComponents = channels == 1 ? 1 : 4;
+                            if(is16Bit)
+                            {
+                                stbi_us* decompressed16 = stbi_load_16_from_memory(copyedData, static_cast<uint32_t>(bytelength), &width, &height, &channels, requiredComponents);
+                                stbdata                 = (stbi_uc*)(decompressed16);
+                            }
+                            else
+                            {
+                                stbdata = stbi_load_from_memory(copyedData, static_cast<uint32_t>(bytelength), &width, &height, &channels, requiredComponents);
+                            }
+
+                            printf("channels = %d\n", channels);
+
+                            switch(requiredComponents)
+                            {
+                            case 1:
+                                format = is16Bit ? VK_FORMAT_R16_UNORM : VK_FORMAT_R8_UNORM;
+                                // For 1-component textures, expand the single channel to RGB for proper grayscale display
+                                swizzle = {VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_ONE};
+                                break;
+                            case 4:
+                                format = is16Bit ? VK_FORMAT_R16G16B16A16_UNORM :
+                                            srgb ? VK_FORMAT_R8G8B8A8_SRGB :
+                                                   VK_FORMAT_R8G8B8A8_UNORM;
+
+                                break;
+                            }
+
+                            size = width * height * requiredComponents * sizeof(uint8_t);
+                            if(is16Bit) size += size;
 
                             ktxTextureCreateInfo createInfo = {
                                 0,

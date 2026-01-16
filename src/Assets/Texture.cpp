@@ -1065,9 +1065,9 @@ namespace Assets
                             ktxBasisParams params = {};
                             params.structSize = sizeof(params);
                             params.uastc = KTX_TRUE;
-                            params.compressionLevel = 2;
-                            params.qualityLevel = 128;
-                            params.threadCount = 12;
+                            params.compressionLevel = 2;    // 4 max, slower
+                            params.qualityLevel = 128;      // 255 max, better quality
+                            params.threadCount = std::thread::hardware_concurrency();
                             result = ktxTexture2_CompressBasisEx(reinterpret_cast<ktxTexture2*>(kTexture), &params);
                             if (KTX_SUCCESS != result) Throw(std::runtime_error("failed to compress ktx2 image "));
                             // save to cache

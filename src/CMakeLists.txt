@@ -176,6 +176,7 @@ foreach(target IN LISTS AllTargets)
 	target_include_directories(${target} PRIVATE ${TINYGLTF_INCLUDE_DIRS})
 	target_include_directories(${target} PRIVATE ${CPP_BASE64_INCLUDE_DIRS})
 	target_include_directories(${target} PRIVATE ThirdParty/ozz/include)
+	target_include_directories(${target} PRIVATE ThirdParty/wuffs-replacement-stb)
 
 	# preprocessor definitions
 	target_compile_definitions(${target} PUBLIC IMGUI_DEFINE_MATH_OPERATORS)

@@ -5,7 +5,7 @@
 
 #if WITH_WUFFS
 #define WUFFS_IMAGE_IMPLEMENTATION
-#include "Utilities/wuffs_image.h"
+#include "wuffs_image.h"
 #endif
 
 #include "Utilities/Exception.hpp"

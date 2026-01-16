@@ -1,5 +1,13 @@
 #include "Texture.hpp"
 #include "Utilities/StbImage.hpp"
+
+#define WITH_WUFFS 1
+
+#if WITH_WUFFS
+#define WUFFS_IMAGE_IMPLEMENTATION
+#include "Utilities/wuffs_image.h"
+#endif
+
 #include "Utilities/Exception.hpp"
 #include "Common/CoreMinimal.hpp"
 
@@ -1002,28 +1010,60 @@ namespace Assets
                         // hash the texname
                         std::string cacheFileName = Utilities::CookHelper::GetCookedFileName(fmt::format("{:016x}", hasher(texname)), "texktx");
                         if (!std::filesystem::exists(cacheFileName))
+#endif
                         {
-                            // load from stbi and compress to ktx and cache
-                            if(!stbi_info_from_memory(copyedData, static_cast<uint32_t>(bytelength), &width, &height, &channels))
-                            {
-                                // LOGW("Failed to get info using stb_image for image %" PRIu64 "\n", imageID);
-                            }
+                            // Declare variables outside to respect scope
+                            bool is16Bit = false;
+                            int requiredComponents = 0;
 
-                            // Read the header again to check if it has 16 bit data, e.g. for a heightmap.
-                            const bool is16Bit = stbi_is_16_bit_from_memory(copyedData, static_cast<uint32_t>(bytelength));
+                            #if WITH_WUFFS
+                                // load from wuffs and compress to ktx and cache
+                                if(wuffs_info_from_memory(copyedData, static_cast<uint32_t>(bytelength), &width, &height, &channels))
+                                {
+                                    // Read the header again to check if it has 16 bit data, e.g. for a heightmap.
+                                    is16Bit = wuffs_is_16_bit_from_memory(copyedData, static_cast<uint32_t>(bytelength));
 
-                            // Load the image
-                            int      requiredComponents = channels;
-                            if(is16Bit)
-                            {
-                                stbi_us* decompressed16 = stbi_load_16_from_memory(copyedData, static_cast<uint32_t>(bytelength), &width, &height, &channels, requiredComponents);
-                                stbdata                 = (stbi_uc*)(decompressed16);
-                            }
-                            else
-                            {
-                                stbdata = stbi_load_from_memory(copyedData, static_cast<uint32_t>(bytelength), &width, &height, &channels, requiredComponents);
-                            }
+                                    // Load the image
+                                    requiredComponents = channels;
+                                    if(is16Bit)
+                                    {
+                                        stbi_us* decompressed16 = wuffs_load_16_from_memory(copyedData, static_cast<uint32_t>(bytelength), &width, &height, &channels, requiredComponents);
+                                        stbdata                 = (stbi_uc*)(decompressed16);
+                                    }
+                                    else
+                                    {
+                                        stbdata = wuffs_load_from_memory(copyedData, static_cast<uint32_t>(bytelength), &width, &height, &channels, requiredComponents);
+                                    }
+                                }
+                                else
+                                {
+                                    SPDLOG_WARN("load texture by WUFFS {} failed.", texname);
+                                }
+                            #else
+                                // load from stbi and compress to ktx and cache
+                                if(stbi_info_from_memory(copyedData, static_cast<uint32_t>(bytelength), &width, &height, &channels))
+                                {
+                                    // Read the header again to check if it has 16 bit data, e.g. for a heightmap.
+                                    is16Bit = stbi_is_16_bit_from_memory(copyedData, static_cast<uint32_t>(bytelength));
 
+                                    // Load the image
+                                    requiredComponents = channels;
+                                    if(is16Bit)
+                                    {
+                                        stbi_us* decompressed16 = stbi_load_16_from_memory(copyedData, static_cast<uint32_t>(bytelength), &width, &height, &channels, requiredComponents);
+                                        stbdata                 = (stbi_uc*)(decompressed16);
+                                    }
+                                    else
+                                    {
+                                        stbdata = stbi_load_from_memory(copyedData, static_cast<uint32_t>(bytelength), &width, &height, &channels, requiredComponents);
+                                    }
+                                }
+                                else
+                                {
+                                    SPDLOG_WARN("load texture {} failed.", texname);
+                                }
+                            #endif
+                            
                             printf("channels = %d\n", channels);
 
                             switch(requiredComponents)
@@ -1054,6 +1094,7 @@ namespace Assets
                             size = width * height * requiredComponents * sizeof(uint8_t);
                             if(is16Bit) size += size;
 
+#if WITH_KTX2
                             ktxTextureCreateInfo createInfo = {
                                 0,
                                 static_cast<uint32_t>(format),
@@ -1084,7 +1125,9 @@ namespace Assets
                             }
                             // save to cache
                             ktxTexture_WriteToNamedFile(kTexture, cacheFileName.c_str());
+#endif
                         }
+#if WITH_KTX2
                         else
                         {
                             result = ktxTexture_CreateFromNamedFile(cacheFileName.c_str(), KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &kTexture);
@@ -1102,14 +1145,21 @@ namespace Assets
                 // load from memory using stb
                 if (stbdata)
                 {
-                    SPDLOG_INFO("Loaded STB from memory: {} ({}x{}, format: {}, srgb: {})", 
+#if WITH_WUFFS
+                    SPDLOG_INFO("Loaded by WUFFS from memory: {} ({}x{}, format: {}, srgb: {})", 
                                 texname, width, height, static_cast<int>(format), srgb);
+#else
+                    SPDLOG_INFO("Loaded by STB from memory: {} ({}x{}, format: {}, srgb: {})", 
+                                texname, width, height, static_cast<int>(format), srgb);
+#endif
                 }
+#if WITH_KTX2
                 else if (kTexture)
                 {
                     SPDLOG_INFO("Loaded KTX from memory: {} ({}x{}, mips: {}, format: {})", 
                                 texname, width, height, miplevel, static_cast<int>(format));
                 }
+#endif
 
                 // create texture image
                 if (!hdr)

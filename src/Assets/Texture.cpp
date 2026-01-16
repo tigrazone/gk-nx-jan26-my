@@ -1007,7 +1007,7 @@ namespace Assets
                             const bool is16Bit = stbi_is_16_bit_from_memory(copyedData, static_cast<uint32_t>(bytelength));
 
                             // Load the image
-                            int      requiredComponents = channels == 1 ? 1 : 4;
+                            int      requiredComponents = channels;
                             if(is16Bit)
                             {
                                 stbi_us* decompressed16 = stbi_load_16_from_memory(copyedData, static_cast<uint32_t>(bytelength), &width, &height, &channels, requiredComponents);
@@ -1026,6 +1026,16 @@ namespace Assets
                                 format = is16Bit ? VK_FORMAT_R16_UNORM : VK_FORMAT_R8_UNORM;
                                 // For 1-component textures, expand the single channel to RGB for proper grayscale display
                                 swizzle = {VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_ONE};
+                                break;
+                            case 2:
+                                format = is16Bit ? VK_FORMAT_R16G16_UNORM : VK_FORMAT_R8G8_UNORM;
+                                swizzle = {VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_ONE};
+                                break;
+                            case 3:
+                                format = is16Bit ? VK_FORMAT_R16G16B16_UNORM : 
+                                            srgb ? VK_FORMAT_R8G8B8_SRGB :
+                                                   VK_FORMAT_R8G8B8_UNORM;
+                                swizzle = {VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_ONE};
                                 break;
                             case 4:
                                 format = is16Bit ? VK_FORMAT_R16G16B16A16_UNORM :

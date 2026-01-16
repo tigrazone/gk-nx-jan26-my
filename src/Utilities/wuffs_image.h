@@ -1,5 +1,5 @@
 /**
- * wuffs_image.h - stb_image-like wrappers for Wuffs (PNG, JPEG, WebP)
+ * wuffs_image.h - stb_image-like wrappers for Wuffs (PNG, JPEG)
  * 
  * This file provides analogs for stbi_info_from_memory, stbi_is_16_bit_from_memory,
  * stbi_load_from_memory, and stbi_load_16_from_memory using the Wuffs library.
@@ -39,7 +39,6 @@ uint8_t* wuffs_load_from_memory(uint8_t const* buffer, int len, int* x, int* y, 
 #define WUFFS_CONFIG__MODULE__BASE
 #define WUFFS_CONFIG__MODULE__PNG
 #define WUFFS_CONFIG__MODULE__JPEG
-#define WUFFS_CONFIG__MODULE__WEBP
 #define WUFFS_CONFIG__MODULE__ADLER32
 #define WUFFS_CONFIG__MODULE__CRC32
 #define WUFFS_CONFIG__MODULE__DEFLATE
@@ -57,8 +56,7 @@ uint8_t* wuffs_load_from_memory(uint8_t const* buffer, int len, int* x, int* y, 
 typedef enum {
     WUFFS_IMAGE_FORMAT_UNKNOWN = 0,
     WUFFS_IMAGE_FORMAT_PNG,
-    WUFFS_IMAGE_FORMAT_JPEG,
-    WUFFS_IMAGE_FORMAT_WEBP
+    WUFFS_IMAGE_FORMAT_JPEG
 } wuffs_image_format;
 
 static wuffs_image_format wuffs_image_detect_format(uint8_t const* buffer, int len) {
@@ -67,9 +65,6 @@ static wuffs_image_format wuffs_image_detect_format(uint8_t const* buffer, int l
     }
     if (len >= 2 && memcmp(buffer, "\xFF\xD8", 2) == 0) {
         return WUFFS_IMAGE_FORMAT_JPEG;
-    }
-    if (len >= 12 && memcmp(buffer, "RIFF", 4) == 0 && memcmp(buffer + 8, "WEBP", 4) == 0) {
-        return WUFFS_IMAGE_FORMAT_WEBP;
     }
     return WUFFS_IMAGE_FORMAT_UNKNOWN;
 }
@@ -82,8 +77,6 @@ static wuffs_base__status wuffs_image_decode_config(wuffs_image_format format,
         return wuffs_png__decoder__decode_image_config((wuffs_png__decoder*)decoder_ptr, config, io_buf);
     } else if (format == WUFFS_IMAGE_FORMAT_JPEG) {
         return wuffs_jpeg__decoder__decode_image_config((wuffs_jpeg__decoder*)decoder_ptr, config, io_buf);
-    } else if (format == WUFFS_IMAGE_FORMAT_WEBP) {
-        return wuffs_webp__decoder__decode_image_config((wuffs_webp__decoder*)decoder_ptr, config, io_buf);
     }
     return wuffs_base__make_status(wuffs_base__error__unsupported_method);
 }
@@ -99,7 +92,6 @@ int wuffs_info_from_memory(uint8_t const* buffer, int len, int* x, int* y, int* 
     union decoder_union {
         wuffs_png__decoder png;
         wuffs_jpeg__decoder jpeg;
-        wuffs_webp__decoder webp;
     };
     union decoder_union* dec = (union decoder_union*)malloc(sizeof(union decoder_union));
     if (!dec) return 0;
@@ -109,8 +101,6 @@ int wuffs_info_from_memory(uint8_t const* buffer, int len, int* x, int* y, int* 
         status = wuffs_png__decoder__initialize(&dec->png, sizeof(dec->png), WUFFS_VERSION, 0);
     } else if (format == WUFFS_IMAGE_FORMAT_JPEG) {
         status = wuffs_jpeg__decoder__initialize(&dec->jpeg, sizeof(dec->jpeg), WUFFS_VERSION, 0);
-    } else if (format == WUFFS_IMAGE_FORMAT_WEBP) {
-        status = wuffs_webp__decoder__initialize(&dec->webp, sizeof(dec->webp), WUFFS_VERSION, 0);
     } else {
         free(dec);
         return 0;
@@ -127,7 +117,7 @@ int wuffs_info_from_memory(uint8_t const* buffer, int len, int* x, int* y, int* 
         wuffs_base__pixel_format pfmt = wuffs_base__pixel_config__pixel_format(&config.pixcfg);
         /* Simple heuristic for channels */
         if (wuffs_base__pixel_format__coloration(&pfmt) == WUFFS_BASE__PIXEL_COLORATION__GRAY) *comp = 1;
-        else *comp = 4; /* Wuffs often defaults to RGBA for PNG/WebP */
+        else *comp = 4; /* Wuffs often defaults to RGBA for PNG */
     }
 
     free(dec);
@@ -166,7 +156,6 @@ static void* wuffs_image_load_generic(uint8_t const* buffer, int len, int* x, in
     union decoder_union {
         wuffs_png__decoder png;
         wuffs_jpeg__decoder jpeg;
-        wuffs_webp__decoder webp;
     };
     union decoder_union* dec = (union decoder_union*)malloc(sizeof(union decoder_union));
     if (!dec) return NULL;
@@ -176,8 +165,6 @@ static void* wuffs_image_load_generic(uint8_t const* buffer, int len, int* x, in
         status = wuffs_png__decoder__initialize(&dec->png, sizeof(dec->png), WUFFS_VERSION, 0);
     } else if (format == WUFFS_IMAGE_FORMAT_JPEG) {
         status = wuffs_jpeg__decoder__initialize(&dec->jpeg, sizeof(dec->jpeg), WUFFS_VERSION, 0);
-    } else if (format == WUFFS_IMAGE_FORMAT_WEBP) {
-        status = wuffs_webp__decoder__initialize(&dec->webp, sizeof(dec->webp), WUFFS_VERSION, 0);
     } else {
         free(dec);
         return NULL;
@@ -240,8 +227,6 @@ static void* wuffs_image_load_generic(uint8_t const* buffer, int len, int* x, in
         workbuf_len_range = wuffs_png__decoder__workbuf_len(&dec->png);
     } else if (format == WUFFS_IMAGE_FORMAT_JPEG) {
         workbuf_len_range = wuffs_jpeg__decoder__workbuf_len(&dec->jpeg);
-    } else if (format == WUFFS_IMAGE_FORMAT_WEBP) {
-        workbuf_len_range = wuffs_webp__decoder__workbuf_len(&dec->webp);
     }
     
     if (workbuf_len_range.max_incl > 0) {
@@ -267,8 +252,6 @@ static void* wuffs_image_load_generic(uint8_t const* buffer, int len, int* x, in
         status = wuffs_png__decoder__decode_frame(&dec->png, &pb, &io_buf, WUFFS_BASE__PIXEL_BLEND__SRC, workbuf, NULL);
     } else if (format == WUFFS_IMAGE_FORMAT_JPEG) {
         status = wuffs_jpeg__decoder__decode_frame(&dec->jpeg, &pb, &io_buf, WUFFS_BASE__PIXEL_BLEND__SRC, workbuf, NULL);
-    } else if (format == WUFFS_IMAGE_FORMAT_WEBP) {
-        status = wuffs_webp__decoder__decode_frame(&dec->webp, &pb, &io_buf, WUFFS_BASE__PIXEL_BLEND__SRC, workbuf, NULL);
     }
     
     if (workbuf.ptr) free(workbuf.ptr);

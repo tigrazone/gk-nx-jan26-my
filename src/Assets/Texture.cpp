@@ -1064,7 +1064,7 @@ namespace Assets
                                 }
                             #endif
                             
-                            printf("channels = %d\n", channels);
+                            // printf("channels = %d\n", channels);
 
                             switch(requiredComponents)
                             {
@@ -1142,6 +1142,7 @@ namespace Assets
                     }
                 }
 
+/*
                 // load from memory using stb
                 if (stbdata)
                 {
@@ -1160,6 +1161,7 @@ namespace Assets
                                 texname, width, height, miplevel, static_cast<int>(format));
                 }
 #endif
+*/
 
                 // create texture image
                 if (!hdr)
@@ -1252,7 +1254,7 @@ namespace Assets
         TextureTaskContext taskContext{};
         task.GetContext(taskContext);
         textureImages_[taskContext.textureId]->MainThreadPostLoading(mainThreadCommandPool_);
-        //SPDLOG_INFO("{}", taskContext.outputInfo.data());
+        SPDLOG_INFO("{}", taskContext.outputInfo.data());
         delete[] copyedData;
 
         if (taskContext.needFlushHDRSH)

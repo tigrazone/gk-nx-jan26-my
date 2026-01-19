@@ -5,7 +5,7 @@
 
 #if WITH_WUFFS
 #define WUFFS_IMAGE_IMPLEMENTATION
-#include "wuffs_image.h"
+#include "release/c/wuffs-v0.4.c"
 #endif
 
 #include "Utilities/Exception.hpp"
@@ -1018,21 +1018,21 @@ namespace Assets
 
                             #if WITH_WUFFS
                                 // load from wuffs and compress to ktx and cache
-                                if(wuffs_info_from_memory(copyedData, static_cast<uint32_t>(bytelength), &width, &height, &channels))
+                                if(stbi_info_from_memory(copyedData, static_cast<uint32_t>(bytelength), &width, &height, &channels))
                                 {
                                     // Read the header again to check if it has 16 bit data, e.g. for a heightmap.
-                                    is16Bit = wuffs_is_16_bit_from_memory(copyedData, static_cast<uint32_t>(bytelength));
+                                    is16Bit = stbi_is_16_bit_from_memory(copyedData, static_cast<uint32_t>(bytelength));
 
                                     // Load the image
                                     requiredComponents = channels;
                                     if(is16Bit)
                                     {
-                                        stbi_us* decompressed16 = wuffs_load_16_from_memory(copyedData, static_cast<uint32_t>(bytelength), &width, &height, &channels, requiredComponents);
+                                        stbi_us* decompressed16 = stbi_load_16_from_memory(copyedData, static_cast<uint32_t>(bytelength), &width, &height, &channels, requiredComponents);
                                         stbdata                 = (stbi_uc*)(decompressed16);
                                     }
                                     else
                                     {
-                                        stbdata = wuffs_load_from_memory(copyedData, static_cast<uint32_t>(bytelength), &width, &height, &channels, requiredComponents);
+                                        stbdata = stbi_load_from_memory(copyedData, static_cast<uint32_t>(bytelength), &width, &height, &channels, requiredComponents);
                                     }
                                 }
                                 else
